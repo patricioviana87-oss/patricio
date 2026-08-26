@@ -137,7 +137,11 @@ def escribir_reporte(resultado: dict, path_salida: str) -> None:
     total_row = last + 2
     ws_p.cell(row=total_row, column=1, value="TOTAL").font = Font(name=FUENTE, bold=True)
     col_letter = get_column_letter(list(pp.columns).index("MONTO PENDIENTE") + 1)
-    total_cell = ws_p.cell(row=total_row, column=2, value=f"=SUM({col_letter}2:{col_letter}{last})")
+    if len(pp) > 0:
+        total_value = f"=SUM({col_letter}2:{col_letter}{last})"
+    else:
+        total_value = 0
+    total_cell = ws_p.cell(row=total_row, column=2, value=total_value)
     total_cell.font = Font(name=FUENTE, bold=True)
     total_cell.number_format = MONEY_FMT
     _autosize(ws_p, len(pp.columns))
