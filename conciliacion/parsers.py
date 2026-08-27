@@ -105,6 +105,8 @@ def leer_query_cuenta(path: str) -> QueryCuenta:
     df["FECHAAPLICACION"] = pd.to_datetime(df["FECHAAPLICACION"], format="%d/%m/%Y", errors="coerce")
 
     df["NUMEROTRANSACCIONORIGEN"] = pd.to_numeric(df["NUMEROTRANSACCIONORIGEN"], errors="coerce").astype("Int64")
+    df["NUMERO"] = pd.to_numeric(df["NUMERO"], errors="coerce").astype("Int64")
+    df["NUMEROITEM"] = pd.to_numeric(df["NUMEROITEM"], errors="coerce").astype("Int64")
 
     texto = df["TRANSACCIONORIGEN"].astype(str)
     df["TIPO_MOVIMIENTO"] = "OTRO"

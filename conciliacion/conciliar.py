@@ -3,7 +3,13 @@
 Conciliación automática: Query de la cuenta (mayor contable) vs. Informe de Pagos.
 
 Uso:
-    python3 conciliar.py QUERY_CUENTA.xls INFORME_PAGOS.xls SALIDA.xlsx
+    python3 conciliar.py QUERY_CUENTA.xls INFORME_PAGOS.xls SALIDA.xlsx [carpeta_historial]
+
+Cada corrida ACUMULA la Query y el Informe de Pagos que le vayas cargando (mes a
+mes) en `carpeta_historial` (por defecto: `historial/`, junto al script), y
+concilia contra TODO lo acumulado hasta ahora — no solo contra el archivo del
+día. Así, un pago que queda pendiente este mes y se concilia recién el mes que
+viene queda bien reflejado la próxima vez que corras el programa. Ver README.md.
 
 Lógica (replica el criterio manual, ver instrucciones del archivo de control):
   - Cada "Egreso de Valores Nro. X" en el mayor es un pago emitido (pasa a
@@ -12,29 +18,34 @@ Lógica (replica el criterio manual, ver instrucciones del archivo de control):
     como "Egreso de Valores Anulado Nro. X" (anulación del comprobante).
   - El Informe de Pagos ya indica, por cada Egreso, si está CONCILIADO (SI/NO),
     con qué lote (NUMCONCIL) y en qué fecha. Se usa como fuente de verdad del
-    estado, y se valida contra el mayor.
+    estado, y se valida contra el mayor. El campo NUMCONCIL puede venir
+    abreviado ("Conc.Valor Nro.") en vez del texto completo que usa el mayor
+    ("Conciliación de Valores Nro."); no importa, porque el cruce NO se hace
+    por ese texto sino por el número de egreso (NUMEROTRANSACCIONORIGEN vs.
+    NRO_EGRESO_VALOR), así que esa variación de formato no afecta el resultado.
   - Saldo pendiente = suma de los egresos NO conciliados y no anulados.
-    Ese saldo pendiente debe coincidir con el total del mayor de la cuenta
-    (columna TOTAL/HABER-DEBE) — si no coincide, hay diferencias para revisar
-    a mano (comprobantes fuera del rango de fechas de alguno de los dos
-    archivos, etc.), y el programa las lista aparte.
+    Ese saldo pendiente debe coincidir con el total acumulado del mayor de la
+    cuenta (columna TOTAL/HABER-DEBE) — si no coincide, hay diferencias para
+    revisar a mano, y el programa las lista aparte.
 """
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import pandas as pd
 
+from historial import actualizar_historial_informe, actualizar_historial_query
 from parsers import leer_query_cuenta, leer_informe_pagos
 from reporte import escribir_reporte
 
 TOLERANCIA = 0.5  # pesos; margen de redondeo para considerar "conciliado en el mayor"
 
+HISTORIAL_POR_DEFECTO = Path(__file__).parent / "historial"
 
-def conciliar(path_query: str, path_informe: str) -> dict:
-    qc = leer_query_cuenta(path_query)
-    informe = leer_informe_pagos(path_informe)
-    q = qc.df
+
+def conciliar(q: pd.DataFrame, informe: pd.DataFrame) -> dict:
+    """Concilia a partir de las tablas YA ACUMULADAS de Query e Informe de Pagos."""
 
     # El Informe de Pagos a veces trae más de una fila para el mismo egreso
     # (p.ej. una versión vieja "NO conciliado" y una más nueva "SI"). Nos
@@ -80,7 +91,7 @@ def conciliar(path_query: str, path_informe: str) -> dict:
 
     detalle["NRO_EGRESO"] = detalle["NUMEROTRANSACCIONORIGEN"].combine_first(detalle["NRO_EGRESO_VALOR"])
     detalle["PROVEEDOR"] = detalle["DESTINATARIO"]
-    detalle["DETALLE"] = detalle["DETALLE_OP"].combine_first(detalle["DETALLE_ITEM"])
+    detalle["DETALLE"] = detalle["DETALLE_OP"].combine_first(detalle["TRANSACCIONORIGEN"])
     detalle["MONTO"] = detalle["IMPORTE"].combine_first(detalle["MONTO_SIGNADO"].abs())
     detalle["FECHA"] = detalle["FECHAVENC"].combine_first(detalle["FECHATR"])
 
@@ -104,7 +115,7 @@ def conciliar(path_query: str, path_informe: str) -> dict:
     detalle_final = detalle[columnas_salida].sort_values(["ESTADO", "FECHA"], na_position="last")
 
     saldo_pendiente = float(detalle.loc[detalle["ESTADO"] == "PENDIENTE", "MONTO"].sum())
-    total_mayor = qc.total_cuenta
+    total_mayor = float(q["MONTO_SIGNADO"].sum())
     diferencia_control = saldo_pendiente - total_mayor
 
     resumen = {
@@ -153,15 +164,24 @@ def conciliar(path_query: str, path_informe: str) -> dict:
 
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         print(__doc__)
         sys.exit(1)
     path_query, path_informe, path_salida = sys.argv[1:4]
-    resultado = conciliar(path_query, path_informe)
+    historial_dir = Path(sys.argv[4]) if len(sys.argv) == 5 else HISTORIAL_POR_DEFECTO
+
+    qc_nuevo = leer_query_cuenta(path_query)
+    informe_nuevo = leer_informe_pagos(path_informe)
+
+    q_acumulada = actualizar_historial_query(qc_nuevo.df, historial_dir)
+    informe_acumulado = actualizar_historial_informe(informe_nuevo, historial_dir)
+
+    resultado = conciliar(q_acumulada, informe_acumulado)
     escribir_reporte(resultado, path_salida)
 
+    print(f"Historial acumulado en:    {historial_dir}")
     r = resultado["resumen"]
-    print(f"Egresos analizados:        {r['total_egresos']}")
+    print(f"Egresos analizados (histórico total): {r['total_egresos']}")
     print(f"  Conciliados:             {r['conciliados']}")
     print(f"  Pendientes:              {r['pendientes']}")
     print(f"  Anulados:                {r['anulados']}")
@@ -169,7 +189,7 @@ def main():
     print(f"  Pagos fuera de período:  {r['pagos_fuera_de_periodo']} (informativo, no es un error)")
     print()
     print(f"Saldo pendiente (Informe): {r['saldo_pendiente']:,.2f}")
-    print(f"Movimiento neto de la Query: {r['total_mayor_cuenta']:,.2f}")
+    print(f"Movimiento neto acumulado en historial: {r['total_mayor_cuenta']:,.2f}")
     print(f"Diferencia:                {r['diferencia_control']:,.2f}")
     print()
     print(f"Reporte generado en: {path_salida}")

@@ -85,7 +85,7 @@ def escribir_reporte(resultado: dict, path_salida: str) -> None:
     ws_r["A1"].font = Font(name=FUENTE, bold=True, size=14)
 
     filas = [
-        ("Egresos analizados (en la Query)", r["total_egresos"]),
+        ("Egresos analizados (histórico acumulado)", r["total_egresos"]),
         ("Conciliados", r["conciliados"]),
         ("Pendientes", r["pendientes"]),
         ("Anulados", r["anulados"]),
@@ -93,7 +93,7 @@ def escribir_reporte(resultado: dict, path_salida: str) -> None:
         ("Pagos del Informe fuera de este período (informativo)", r["pagos_fuera_de_periodo"]),
         (None, None),
         ("Saldo pendiente (según Informe de Pagos)", r["saldo_pendiente"]),
-        ("Movimiento neto de la Query cargada", r["total_mayor_cuenta"]),
+        ("Movimiento neto acumulado en el historial", r["total_mayor_cuenta"]),
         ("Diferencia", r["diferencia_control"]),
     ]
     start = 3
@@ -110,13 +110,14 @@ def escribir_reporte(resultado: dict, path_salida: str) -> None:
     ws_r.column_dimensions["B"].width = 20
 
     nota = (
-        "Nota: 'Saldo pendiente' y 'Movimiento neto de la Query' solo van a coincidir si la Query "
-        "que cargaste tiene el historico COMPLETO de la cuenta (todos los meses acumulados), como en "
-        "el proceso manual. Si cargaste un solo mes, la diferencia es esperable (hay conciliaciones "
-        "de ese mes que cancelan egresos de meses anteriores, y egresos de este mes que se van a "
-        "conciliar recien el mes que viene). Para un control exacto de saldo, complementar con el "
-        "saldo contable real de la cuenta. Revisar la hoja 'Revisar' para los egresos sin cruce contra "
-        "el Informe de Pagos o con importe distinto."
+        "Nota: el programa acumula la Query y el Informe de Pagos entre corridas (carpeta 'historial/'), "
+        "asi que 'Saldo pendiente' y 'Movimiento neto acumulado' se acercan cada vez mas a medida que "
+        "pasan los meses y se van cargando. En las primeras corridas es normal que no cierren exacto: "
+        "todavia no esta cargado el historial completo de la cuenta desde su origen (hay conciliaciones "
+        "que cancelan egresos anteriores a la primera Query que cargaste). Para un control exacto de "
+        "saldo desde el arranque, complementar con el saldo contable real de la cuenta a la fecha en que "
+        "empezaste a usar el programa. Revisar la hoja 'Revisar' para los egresos sin cruce contra el "
+        "Informe de Pagos o con importe distinto."
     )
     ws_r.cell(row=start + len(filas) + 1, column=1, value=nota).font = Font(name=FUENTE, italic=True, size=9)
     ws_r.merge_cells(start_row=start + len(filas) + 1, start_column=1, end_row=start + len(filas) + 1, end_column=6)
