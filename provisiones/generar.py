@@ -44,7 +44,7 @@ def _sanitizar_nombre(sector: str) -> str:
     return sector.strip().replace(" ", "_").replace(".", "").replace("/", "-")
 
 
-def generar_asientos(path_provisiones: str, anio: int, carpeta_salida: Path) -> list[Path]:
+def generar_asientos(path_provisiones: str, anio: int, carpeta_salida: Path, on_linea=print) -> list[Path]:
     provisiones = leer_provisiones(path_provisiones)
     if not provisiones:
         raise ValueError("El archivo de provisiones no tiene renglones para procesar")
@@ -113,7 +113,7 @@ def generar_asientos(path_provisiones: str, anio: int, carpeta_salida: Path) -> 
         archivos.append(path_salida)
 
         total_sector = sum(p.importe for p in items)
-        print(f"  {sector} ({mes:02d}/{anio}): {len(items)} líneas, total ${total_sector:,.2f} -> {nombre_archivo}")
+        on_linea(f"  {sector} ({mes:02d}/{anio}): {len(items)} líneas, total ${total_sector:,.2f} -> {nombre_archivo}")
 
     return archivos
 

@@ -59,6 +59,20 @@ pip install -r requirements.txt
 
 ## Cómo correrlo cada mes
 
+### Opción A: con ventana (recomendado si no usás la terminal)
+
+Doble clic en **`Ejecutar.bat`**. Se abre una ventana con:
+
+1. Un botón para elegir el archivo de provisiones del mes.
+2. Un campo para el año.
+3. Un botón "Generar asientos".
+
+Los archivos quedan en una carpeta **`Asientos_generados`** creada al lado
+del archivo de provisiones que elegiste, y esa carpeta se abre sola al
+terminar.
+
+### Opción B: por línea de comandos
+
 ```bash
 python3 generar.py PROVISIONES.xlsx 2026
 ```
